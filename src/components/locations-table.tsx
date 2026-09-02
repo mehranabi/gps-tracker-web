@@ -9,6 +9,14 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -18,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { GpsRecord } from '@/lib/locations'
+import { GpsRecord, PAGE_SIZE_OPTIONS } from '@/lib/locations'
 
 const EMPTY_DATA: GpsRecord[] = []
 
@@ -77,23 +85,23 @@ const columns = columnHelper.columns([
     header: 'Course',
     cell: (info) => formatNumber(info.getValue(), 2),
   }),
-  columnHelper.accessor('hdop', {
-    header: 'HDOP',
-    cell: (info) => formatNumber(info.getValue(), 2),
+  columnHelper.display({
+    id: 'accuracy',
+    header: 'Accuracy (H/P/V)',
+    cell: (info) => {
+      const record = info.row.original
+
+      return `${formatNumber(record.hdop, 2)} / ${formatNumber(record.pdop, 2)} / ${formatNumber(record.vdop, 2)}`
+    },
   }),
-  columnHelper.accessor('pdop', {
-    header: 'PDOP',
-    cell: (info) => formatNumber(info.getValue(), 2),
-  }),
-  columnHelper.accessor('vdop', {
-    header: 'VDOP',
-    cell: (info) => formatNumber(info.getValue(), 2),
-  }),
-  columnHelper.accessor('satsView', {
-    header: 'Sats view',
-  }),
-  columnHelper.accessor('satsUsed', {
-    header: 'Sats used',
+  columnHelper.display({
+    id: 'sats',
+    header: 'Sats (U/V)',
+    cell: (info) => {
+      const record = info.row.original
+
+      return `${record.satsUsed}/${record.satsView}`
+    },
   }),
 ])
 
@@ -101,6 +109,7 @@ type LocationsTableProps = {
   data: GpsRecord[]
   isLoading: boolean
   onNextPage: () => void
+  onPageSizeChange: (pageSize: number) => void
   onPreviousPage: () => void
   page: number
   pageSize: number
@@ -111,12 +120,14 @@ export function LocationsTable({
   data,
   isLoading,
   onNextPage,
+  onPageSizeChange,
   onPreviousPage,
   page,
   pageSize,
   total,
 }: LocationsTableProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const showSkeleton = isLoading && data.length === 0
 
   const table = useTable({
     columns,
@@ -152,7 +163,7 @@ export function LocationsTable({
           ))}
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {showSkeleton ? (
             Array.from({ length: 5 }).map((_, rowIndex) => (
               <TableRow key={`skeleton-${rowIndex}`}>
                 {columns.map((column, cellIndex) => (
@@ -185,11 +196,36 @@ export function LocationsTable({
         </TableBody>
       </Table>
       <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-        <p className='text-muted-foreground text-sm'>
-          {total === 0
-            ? '0 records'
-            : `${from}–${to} of ${total} records · page ${page} of ${pageCount}`}
-        </p>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+          <p className='text-muted-foreground text-sm'>
+            {total === 0
+              ? '0 records'
+              : `${from}–${to} of ${total} records · page ${page} of ${pageCount}`}
+          </p>
+          <div className='flex items-center gap-2'>
+            <Label htmlFor='page-size'>Records per page</Label>
+            <Select
+              onValueChange={(value) => onPageSizeChange(Number(value))}
+              value={String(pageSize)}
+            >
+              <SelectTrigger
+                className='w-20'
+                disabled={isLoading}
+                id='page-size'
+                size='sm'
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position='popper'>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <div className='flex gap-2'>
           <Button
             disabled={isLoading || page <= 1}
